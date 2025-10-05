@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>카드 디펜스 MVP</title>
+  <style>
+    :root{ --ui-bg:#0f1220; --panel:#171a2a; --ink:#e6e8ff; --muted:#9aa1c6; --accent:#6dd3ff; --good:#3ad07a; --bad:#ff5a7a; --warn:#ffd166; }
+    *{ box-sizing:border-box; }
+    body{ margin:0; font-family: ui-sans-serif,system-ui,Segoe UI,Roboto,Apple Color Emoji,Noto Color Emoji,Apple SD Gothic Neo,Pretendard,Malgun Gothic,sans-serif; color:var(--ink); background: radial-gradient(1200px 800px at 50% -200px, #1a1f37 0%, #0b0e1a 70%);}    
+    header{ display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid #242846; background:linear-gradient(180deg,#111424,#0b0e1a); position:sticky; top:0; z-index:10; }
+    .brand{ display:flex; gap:10px; align-items:center; font-weight:800; letter-spacing:0.3px; }
+    .brand .logo{ width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg,#6dd3ff,#7d76ff); box-shadow:0 0 16px rgba(109,211,255,0.5) inset; }
+    .controls{ display:flex; gap:8px; align-items:center; }
+    select,button{ background:var(--panel); color:var(--ink); border:1px solid #2a2f4f; border-radius:10px; padding:8px 12px; font-weight:600; cursor:pointer; }
+    button:hover{ border-color:#3a4170; }
+    .layout{ display:grid; grid-template-columns: 320px 1fr 320px; gap:12px; padding:12px; }
+    .panel{ background:rgba(18,22,38,0.8); border:1px solid #232744; border-radius:16px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,0.35); }
+    .h{ font-size:14px; color:var(--muted); margin:0 0 8px; letter-spacing:0.3px; }
+    .mana{ height:14px; border-radius:8px; background:#1a1f2f; border:1px solid #2a2f4f; overflow:hidden; position:relative; }
+    .mana .fill{ background:linear-gradient(90deg,#4fc3f7,#6dd3ff); height:100%; width:0; transition: width .2s ease; }
+    .mana .txt{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; color:#dff6ff; text-shadow:0 1px 0 #000; }
+
+    /* 카드 바 */
+    .cards{ display:grid; grid-template-columns: repeat(3,1fr); gap:8px; }
+    .card{ background:linear-gradient(180deg,#181d34,#0f1325); border:1px solid #2a2f4f; border-radius:12px; padding:10px; cursor:pointer; box-shadow:inset 0 0 0 1px rgba(255,255,255,0.02); }
+    .card.sel{ outline:2px solid var(--accent); }
+    .card .name{ font-weight:800; margin-bottom:6px; }
+    .card .cost{ font-size:12px; color:var(--muted); }
+    .tip{ font-size:12px; color:var(--muted); margin-top:8px; line-height:1.4; }
+
+    /* 캔버스 */
+    .stage-wrap{ position:relative; border-radius:16px; overflow:hidden; border:1px solid #242846; }
+    canvas{ display:block; width:100%; height:auto; background:linear-gradient(180deg,#101428,#0a0d1c); }
+    .hud{ position:absolute; inset:8px; pointer-events:none; }
+    .bases{ display:flex; justify-content:space-between; font-weight:800; opacity:0.9; }
+
+    .howto{ font-size:14px; line-height:1.6; color:#cfd6ff; }
+    .kbd{ display:inline-block; padding:2px 6px; border:1px solid #2a2f4f; border-radius:6px; background:#12162a; font-size:12px; }
+
+    footer{ text-align:center; color:#7f86b5; font-size:12px; padding:10px 0 20px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><div class="logo"></div><div>카드 디펜스 MVP</div></div>
+    <div class="controls">
+      <label class="h" style="margin-right:6px">모드</label>
+      <select id="mode">
+        <option value="single">싱글 (AI 대전)</option>
+        <option value="local2p">2인 로컬 (동일 기기)</option>
+      </select>
+      <button id="btnReset">게임 재시작</button>
+      <button id="btnPause">일시정지</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- 좌측: 플레이어1 패널 -->
+    <section class="panel">
+      <p class="h">플레이어 1 (좌측)</p>
+      <div class="mana" aria-label="P1 마나"><div id="p1Bar" class="fill"></div><div id="p1Txt" class="txt">0 / 10</div></div>
+      <div class="cards" id="p1Cards"></div>
+      <p class="tip">카드를 클릭하고, 좌측 절반의 원하는 <b>레인</b>을 클릭하여 소환하세요.</p>
+    </section>
+
+    <!-- 중앙: 게임 스테이지 -->
+    <section class="panel stage-wrap">
+      <canvas id="game" width="960" height="540" aria-label="게임 캔버스"></canvas>
+      <div class="hud">
+        <div class="bases">
+          <div>▶ P1 베이스 HP: <span id="p1Base">100</span></div>
+          <div>P2 베이스 HP: <span id="p2Base">100</span> ◀</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 우측: 플레이어2 패널 (로컬2P용) / AI 정보 -->
+    <section class="panel">
+      <p class="h">플레이어 2 (우측) / AI</p>
+      <div class="mana" aria-label="P2 마나"><div id="p2Bar" class="fill"></div><div id="p2Txt" class="txt">0 / 10</div></div>
+      <div class="cards" id="p2Cards"></div>
+      <p class="tip">2인 로컬 모드에서는 우측 절반의 레인을 클릭하여 소환합니다.<br>싱글 모드에서는 AI가 자동 소환합니다.</p>
+    </section>
+  </main>
+
+  <section class="panel" style="margin:0 12px;">
+    <h3 style="margin:6px 0 8px;">플레이 방법 (How to Play)</h3>
+    <div class="howto">
+      • 필드에는 <b>5개의 레인</b>이 있습니다. 좌측(P1) ↔ 우측(P2/AI)에서 유닛이 전진합니다.<br>
+      • 카드를 선택하고 자신의 <b>절반 필드</b>의 레인을 클릭하면 유닛이 소환됩니다.<br>
+      • 유닛은 사거리 내 적을 만나면 <b>이동을 멈추고 공격</b>합니다. 적이 없으면 전진합니다.<br>
+      • 유닛이 상대 베이스에 도달하면 <b>베이스 HP</b>가 감소합니다. 상대 베이스 HP를 0으로 만들면 승리!<br>
+      • <span class="kbd">게임 재시작</span>으로 언제든 초기화할 수 있습니다. <span class="kbd">일시정지</span>로 멈춤/재개.
+    </div>
+  </section>
+
+  <footer>© 2025 카드 디펜스 예제 — GitHub Pages에 바로 올릴 수 있는 단일 파일 MVP</footer>
+
+  <script>
+    // --- 게임 상수/유틸 ----------------------------------------------------
+    const W = 960, H = 540;
+    const LANES = 5;
+    const GRID_TOP = 80, GRID_BOTTOM = H - 20, GRID_LEFT = 40, GRID_RIGHT = W - 40;
+    const BASE_HP_MAX = 100;
+    const MAX_MANA = 10;
+
+    const CARD_DEFS = [
+      { key:'knight', name:'기사(Knight)', cost:4, hp:40, dps:6, range:28, speed:36, attackCd:0.6, color:'#9bdc6a', type:'melee' },
+      { key:'archer', name:'궁수(Archer)', cost:6, hp:24, dps:8, range:180, speed:24, attackCd:0.9, color:'#6dd3ff', type:'ranged' },
+      { key:'mage',   name:'메이지(Mage)',   cost:7, hp:22, dps:11,range:150, speed:20, attackCd:1.1,color:'#dda6ff', type:'ranged' },
+    ];
+
+    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+    // --- 상태 ---------------------------------------------------------------
+    const state = {
+      mode: 'single', // 'single' | 'local2p'
+      running: true,
+      last: 0,
+      p1: { mana: 0, baseHp: BASE_HP_MAX, sel:null },
+      p2: { mana: 0, baseHp: BASE_HP_MAX, sel:null },
+      units: [], // {side:'p1'|'p2', lane:0..4, x:number, hp, cd:number, def: CARD_DEF}
+      projectiles: [] // for ranged attacks
+    };
+
+    // --- DOM ----------------------------------------------------------------
+    const modeSel = document.getElementById('mode');
+    const p1Bar = document.getElementById('p1Bar');
+    const p2Bar = document.getElementById('p2Bar');
+    const p1Txt = document.getElementById('p1Txt');
+    const p2Txt = document.getElementById('p2Txt');
+    const p1BaseTxt = document.getElementById('p1Base');
+    const p2BaseTxt = document.getElementById('p2Base');
+    const btnReset = document.getElementById('btnReset');
+    const btnPause = document.getElementById('btnPause');
+    const p1Cards = document.getElementById('p1Cards');
+    const p2Cards = document.getElementById('p2Cards');
+
+    const cvs = document.getElementById('game');
+    const ctx = cvs.getContext('2d');
+
+    // --- UI: 카드 생성 ------------------------------------------------------
+    function renderCards(){
+      function makeCardEl(owner){
+        return CARD_DEFS.map((d,i)=>{
+          const el = document.createElement('div');
+          el.className = 'card';
+          el.dataset.key = d.key;
+          el.innerHTML = `<div class="name">${d.name}</div><div class="cost">코스트 ${d.cost} • ${d.type==='ranged'?'원거리':'근접'}</div>`;
+          el.addEventListener('click', ()=>{
+            const side = owner==='p1'? state.p1 : state.p2;
+            const parent = owner==='p1'? p1Cards : p2Cards;
+            // 토글 선택
+            if(side.sel===d.key){ side.sel=null; } else { side.sel=d.key; }
+            [...parent.children].forEach(c=>c.classList.toggle('sel', c.dataset.key===side.sel));
+          });
+          return el;
+        });
+      }
+      p1Cards.replaceChildren(...makeCardEl('p1'));
+      p2Cards.replaceChildren(...makeCardEl('p2'));
+    }
+
+    // --- 좌표 & 레인 --------------------------------------------------------
+    const laneY = i => GRID_TOP + (i+0.5) * ((GRID_BOTTOM-GRID_TOP)/LANES);
+    const p1SpawnX = GRID_LEFT + 20;
+    const p2SpawnX = GRID_RIGHT - 20;
+
+    function worldToLane(y){
+      const h = (GRID_BOTTOM-GRID_TOP)/LANES;
+      return clamp(Math.floor((y - GRID_TOP)/h), 0, LANES-1);
+    }
+
+    // --- 유닛/전투 로직 -----------------------------------------------------
+    function spawn(side, key, lane){
+      const def = CARD_DEFS.find(c=>c.key===key);
+      if(!def) return false;
+      const owner = side==='p1'? state.p1 : state.p2;
+      if(owner.mana < def.cost) return false;
+      owner.mana -= def.cost;
+      owner.sel = null; // 사용 후 선택 해제
+      const x = side==='p1' ? p1SpawnX : p2SpawnX;
+      state.units.push({ side, lane, x, hp:def.hp, cd:0, def });
+      // 선택 하이라이트 해제
+      const parent = side==='p1'? p1Cards : p2Cards;
+      [...parent.children].forEach(c=>c.classList.remove('sel'));
+      return true;
+    }
+
+    function findTarget(me){
+      // 같은 레인, 반대 진영, 사거리 내 가장 가까운 적
+      let best=null, bestDist=1e9;
+      for(const u of state.units){
+        if(u===me) continue;
+        if(u.lane!==me.lane) continue;
+        if(u.side===me.side) continue;
+        const dist = Math.abs(u.x - me.x);
+        if(dist <= me.def.range && dist < bestDist){ best=u; bestDist=dist; }
+      }
+      return best;
+    }
+
+    function updateUnits(dt){
+      // 공격/이동
+      for(const u of state.units){
+        u.cd = Math.max(0, u.cd - dt);
+        const target = findTarget(u);
+        if(target){
+          // 사거리 내: 공격
+          if(u.cd<=0){
+            if(u.def.type==='ranged'){
+              state.projectiles.push({ x:u.x, y: laneY(u.lane), vx: (u.side==='p1'? 1:-1)*240, dmg:u.def.dps, side:u.side });
+            } else {
+              target.hp -= u.def.dps; // 근접 즉시 타격 (초당 dps, cd로 절대량 관리)
+            }
+            u.cd = u.def.attackCd;
+          }
+        } else {
+          // 전진
+          const dir = u.side==='p1'? 1 : -1;
+          u.x += dir * u.def.speed * dt;
+        }
+      }
+
+      // 투사체 이동/피격
+      for(const p of state.projectiles){ p.x += p.vx * dt; }
+      // 명중 판정 (같은 레인, 가장 가까운 적과의 x 교차)
+      for(const p of state.projectiles){
+        let hit=null, hitDist=9999;
+        for(const u of state.units){
+          if(u.side===p.side) continue;
+          if(Math.abs(laneY(u.lane) - p.y)>20) continue;
+          const d = Math.abs(u.x - p.x);
+          if(d < 16 && d < hitDist){ hit=u; hitDist=d; }
+        }
+        if(hit){ hit.hp -= p.dmg; p.dead=true; }
+        if(p.x < GRID_LEFT-40 || p.x > GRID_RIGHT+40) p.dead=true;
+      }
+      state.projectiles = state.projectiles.filter(p=>!p.dead);
+
+      // 베이스 도달
+      for(const u of state.units){
+        if(u.side==='p1' && u.x >= GRID_RIGHT-8){ state.p2.baseHp = Math.max(0, state.p2.baseHp-5); u.hp=0; }
+        if(u.side==='p2' && u.x <= GRID_LEFT+8){ state.p1.baseHp = Math.max(0, state.p1.baseHp-5); u.hp=0; }
+      }
+
+      // 사망 제거
+      state.units = state.units.filter(u=>u.hp>0);
+    }
+
+    // --- 마나/AI ------------------------------------------------------------
+    let aiTimer = 0;
+    function updateMana(dt){
+      const regen = 1.2; // 초당 1.2 마나
+      state.p1.mana = clamp(state.p1.mana + regen*dt, 0, MAX_MANA);
+      state.p2.mana = clamp(state.p2.mana + regen*dt, 0, MAX_MANA);
+    }
+    function runAI(dt){
+      if(state.mode!=='single') return;
+      aiTimer -= dt;
+      if(aiTimer<=0){
+        aiTimer = 0.9 + Math.random()*0.9; // 0.9~1.8초 간격
+        // 간단한 전략: 우리 쪽 레인에 적이 많은 곳을 우선 보강
+        const lanes = [...Array(LANES)].map((_,i)=>i);
+        const prio = lanes.sort((a,b)=> countP1(a)-countP1(b)); // P1 유닛이 많은 레인을 먼저 방어
+        const choice = CARD_DEFS.slice().reverse().find(c=> state.p2.mana>=c.cost );
+        if(choice){ spawn('p2', choice.key, prio[0]); }
+      }
+    }
+    function countP1(lane){ return state.units.filter(u=>u.side==='p1' && u.lane===lane).length; }
+
+    // --- 렌더링 --------------------------------------------------------------
+    function render(){
+      ctx.clearRect(0,0,W,H);
+      // 배경 격자
+      ctx.save();
+      const gH = (GRID_BOTTOM-GRID_TOP)/LANES;
+      for(let i=0;i<LANES;i++){
+        const y = laneY(i);
+        ctx.strokeStyle = 'rgba(120,140,200,0.12)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(GRID_LEFT, y);
+        ctx.lineTo(GRID_RIGHT, y);
+        ctx.stroke();
+      }
+      // 중앙선
+      ctx.strokeStyle = 'rgba(120,140,200,0.18)';
+      ctx.setLineDash([6,6]);
+      ctx.beginPath(); ctx.moveTo(W/2, GRID_TOP-8); ctx.lineTo(W/2, GRID_BOTTOM+8); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 베이스 영역
+      ctx.fillStyle = 'rgba(100,200,255,0.06)';
+      ctx.fillRect(GRID_LEFT-12, GRID_TOP-8, 26, GRID_BOTTOM-GRID_TOP+16);
+      ctx.fillStyle = 'rgba(255,120,160,0.06)';
+      ctx.fillRect(GRID_RIGHT-14, GRID_TOP-8, 26, GRID_BOTTOM-GRID_TOP+16);
+
+      // 유닛
+      for(const u of state.units){
+        const y = laneY(u.lane);
+        const isP1 = u.side==='p1';
+        ctx.fillStyle = isP1 ? '#6dd3ff' : '#ff8ab0';
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+        ctx.lineWidth = 2;
+        // 본체
+        ctx.beginPath();
+        ctx.arc(u.x, y, 12, 0, Math.PI*2);
+        ctx.fill(); ctx.stroke();
+        // HP bar
+        const hpw = 30, hph = 6;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(u.x-hpw/2, y-20, hpw, hph);
+        const hpRatio = clamp(u.hp/u.def.hp, 0, 1);
+        ctx.fillStyle = isP1? '#78ffd6' : '#ffd1e1';
+        ctx.fillRect(u.x-hpw/2, y-20, hpw*hpRatio, hph);
+      }
+
+      // 투사체
+      for(const p of state.projectiles){
+        ctx.fillStyle = p.side==='p1'? '#b6f3ff' : '#ffc1d1';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+
+      // HUD 갱신
+      p1BaseTxt.textContent = Math.round(state.p1.baseHp);
+      p2BaseTxt.textContent = Math.round(state.p2.baseHp);
+      const p1Ratio = state.p1.mana / MAX_MANA;
+      const p2Ratio = state.p2.mana / MAX_MANA;
+      p1Bar.style.width = (p1Ratio*100).toFixed(1)+'%';
+      p2Bar.style.width = (p2Ratio*100).toFixed(1)+'%';
+      p1Txt.textContent = `${Math.floor(state.p1.mana)} / ${MAX_MANA}`;
+      p2Txt.textContent = `${Math.floor(state.p2.mana)} / ${MAX_MANA}`;
+
+      // 승패 메시지
+      if(state.p1.baseHp<=0 || state.p2.baseHp<=0){
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,H);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 42px system-ui, sans-serif'; ctx.textAlign='center';
+        ctx.fillText(state.p1.baseHp<=0? '패배... 다시 도전!' : '승리! 축하합니다!', W/2, H/2);
+        ctx.restore();
+        state.running=false;
+      }
+    }
+
+    // --- 입력: 캔버스 클릭으로 소환 ----------------------------------------
+    cvs.addEventListener('click', (e)=>{
+      if(!state.running) return;
+      const rect = cvs.getBoundingClientRect();
+      const sx = (e.clientX - rect.left) * (W / rect.width);
+      const sy = (e.clientY - rect.top) * (H / rect.height);
+      const lane = worldToLane(sy);
+      const leftHalf = sx < W/2;
+      if(leftHalf){
+        const sel = state.p1.sel; if(!sel) return; spawn('p1', sel, lane);
+      } else {
+        if(state.mode==='local2p'){
+          const sel = state.p2.sel; if(!sel) return; spawn('p2', sel, lane);
+        }
+      }
+    });
+
+    // --- 루프 ---------------------------------------------------------------
+    function loop(ts){
+      const t = ts * 0.001;
+      const dt = state.last? (t - state.last) : 0; 
+      state.last = t;
+      if(state.running){
+        updateMana(dt);
+        runAI(dt);
+        updateUnits(dt);
+        render();
+      }
+      requestAnimationFrame(loop);
+    }
+
+    // --- 모드/리셋 ----------------------------------------------------------
+    function reset(){
+      state.running = true; state.last=0; aiTimer=0;
+      state.p1.mana=5; state.p2.mana=5;
+      state.p1.baseHp = BASE_HP_MAX; state.p2.baseHp = BASE_HP_MAX;
+      state.units.length=0; state.projectiles.length=0;
+      // 카드 선택 초기화
+      state.p1.sel = null; state.p2.sel = null;
+      [...p1Cards.children].forEach(c=>c.classList.remove('sel'));
+      [...p2Cards.children].forEach(c=>c.classList.remove('sel'));
+      render();
+    }
+
+    // --- 이벤트 바인딩 ------------------------------------------------------
+    modeSel.addEventListener('change', ()=>{ state.mode = modeSel.value; reset(); });
+    btnReset.addEventListener('click', reset);
+    btnPause.addEventListener('click', ()=>{ state.running = !state.running; btnPause.textContent = state.running? '일시정지' : '계속하기'; });
+
+    // 초기화
+    renderCards();
+    state.mode = modeSel.value;
+    reset();
+    requestAnimationFrame(loop);
+
+    // --- 앞으로의 확장 계획 (주석) -----------------------------------------
+    // 1) 온라인 대전: Firebase/Socket으로 매치 룸 생성 → 입력 동기화/상태 권한(호스트권) 설계
+    // 2) 카드 확장: 탱커/버퍼/디버퍼, 스펠카드(광역 피해/힐), 코스트/쿨다운 밸런싱
+    // 3) 이펙트/사운드: WebAudio API, 히트스파크, 사거리/타겟 표시
+    // 4) 모바일 터치 최적화: 드래그-드롭 소환, 반응형 HUD
+    // 5) 리플레이/시드 고정: 동일 시드로 재현 가능한 경기
+  </script>
+</body>
+</html>
