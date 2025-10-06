@@ -1,566 +1,343 @@
+<!--
+Project: Sky War (하늘의 전쟁)
+Files included in this single doc:
+  1) /css/sky.css
+  2) /js/user-store.js
+  3) /index.html      (홈)
+  4) /signup.html     (가입)
+  5) /login.html      (로그인)
+  6) /welcome.html    (로그인 성공 후 랜딩)
+
+배포 요령:
+- GitHub에 public repo 생성 → 위 파일 구조 그대로 업로드 → Settings ▸ Pages ▸ Source: “Deploy from a branch” → main /root 선택.
+- 로컬에서 index.html 더블클릭으로도 동작합니다(브라우저 로컬스토리지 사용).
+-->
+
+
+/* =========================
+   File: /css/sky.css
+   ========================= */
+:root{
+  --sky:#bde0fe;    /* 하늘색 */
+  --cloud:#ffffff;  /* 구름색 */
+  --ink:#0b2545;    /* 진한 남색 텍스트 */
+  --btn:#1d4ed8;    /* 파란 버튼 */
+  --btn-ink:#ffffff;
+  --card:#ffffffcc; /* 반투명 카드 */
+  --radius:16px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body.sky{
+  min-height:100%;
+  background: linear-gradient(180deg, var(--sky), #e6f2ff 70%);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, '맑은 고딕', sans-serif;
+  color: var(--ink);
+}
+.container{
+  min-height:100vh;
+  display:grid;
+  place-items:center;
+  position:relative;
+  overflow:hidden;
+  padding:24px;
+}
+.card{
+  background: var(--card);
+  backdrop-filter: blur(6px);
+  border-radius: var(--radius);
+  padding: 24px clamp(20px, 4vw, 36px);
+  box-shadow: 0 10px 30px #00000022;
+  width:min(560px, 92vw);
+}
+h1.title{
+  font-size: clamp(28px, 6vw, 44px);
+  margin: 0 0 12px;
+  letter-spacing: 1px;
+}
+.sub{margin:0 0 20px; opacity:.8}
+.actions{display:flex; gap:12px; flex-wrap:wrap}
+.button{
+  appearance:none; border:0; cursor:pointer;
+  background: var(--btn); color: var(--btn-ink);
+  padding: 12px 18px; border-radius: 12px; font-weight:700;
+  font-size: 16px; box-shadow: 0 6px 16px #1d4ed833;
+}
+.button.secondary{ background:#ffffff; color:var(--ink); box-shadow: 0 4px 10px #00000018; }
+.button:active{ transform: translateY(1px); }
+.input{ width:100%; padding:12px 14px; border-radius:12px; border:1px solid #00000022; background:#fff; font-size:16px }
+.row{ display:grid; gap:10px; margin: 14px 0 }
+.note{ font-size:14px; opacity:.8; }
+.error{ color:#b91c1c; font-weight:700 }
+.ok{ color:#065f46; font-weight:700 }
+
+/* 구름: 2D div를 여러 개 배치 */
+.cloud{ position:absolute; background:var(--cloud); border-radius:999px; filter: drop-shadow(0 6px 8px #00000015); opacity:.95 }
+.cloud::before, .cloud::after{ content:""; position:absolute; background:inherit; border-radius:inherit }
+.cloud.lg{ width:220px; height:70px }
+.cloud.lg::before{ width:110px; height:110px; left:20px; top:-46px }
+.cloud.lg::after { width:130px; height:130px; left:90px; top:-60px }
+.cloud.md{ width:160px; height:52px }
+.cloud.md::before{ width:84px; height:84px; left:14px; top:-36px }
+.cloud.md::after { width:96px; height:96px; left:68px; top:-44px }
+.cloud.sm{ width:120px; height:40px }
+.cloud.sm::before{ width:64px; height:64px; left:10px; top:-28px }
+.cloud.sm::after { width:72px; height:72px; left:48px; top:-34px }
+
+/* 살짝 떠다니는 애니메이션 */
+@keyframes floaty{ 0%{ transform:translateY(0) } 50%{ transform:translateY(-6px) } 100%{ transform:translateY(0) } }
+.float1{ animation: floaty 6s ease-in-out infinite }
+.float2{ animation: floaty 7.5s ease-in-out infinite }
+.float3{ animation: floaty 9s ease-in-out infinite }
+
+/* 상단 고정 헤더(선택) */
+.topbar{ position:fixed; inset: 16px 16px auto 16px; display:flex; justify-content:space-between; align-items:center; z-index:5; }
+.brand{ font-weight:900; font-size:18px; padding:8px 12px; background:#00000015; border-radius:999px }
+
+/* 링크 스타일 */
+a{ color:#1d4ed8; text-decoration:none }
+a:hover{ text-decoration:underline }
+
+
+/* =========================
+   File: /js/user-store.js
+   ========================= */
+<script type="module" id="user-store.js">
+// 간단한 로컬 스토리지 기반 회원 관리(데모용)
+// 실제 서비스에서는 백엔드/DB가 필요합니다.
+const KEY = 'skywar_users_v1';
+
+export function loadUsers(){
+  try{ return JSON.parse(localStorage.getItem(KEY)||'[]') }catch{ return [] }
+}
+export function saveUsers(users){ localStorage.setItem(KEY, JSON.stringify(users)) }
+
+export function nicknameExists(nickname){
+  return loadUsers().some(u=> u.nickname === nickname);
+}
+export function passwordExists(password){
+  return loadUsers().some(u=> u.password === password);
+}
+export function registerUser(nickname, password){
+  const users = loadUsers();
+  users.push({ nickname, password, createdAt: Date.now() });
+  saveUsers(users);
+}
+export function validateLogin(nickname, password){
+  return loadUsers().some(u=> u.nickname===nickname && u.password===password);
+}
+
+// 유틸: 간단한 메시지 표시
+export function show(el, msg, cls){
+  el.textContent = msg; el.className = cls||'';
+}
+</script>
+
+
+<!-- =========================
+     File: /index.html (홈)
+     ========================= -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>카드 디펜스 MVP</title>
-  <style>
-    :root{ --bg:#000; --panel:#0f1220; --ink:#e6e8ff; --muted:#9aa1c6; --accent:#2b6cff; --accent-2:#6dd3ff; --good:#3ad07a; --bad:#ff5a7a; }
-    *{ box-sizing:border-box; }
-    body{ margin:0; font-family: ui-sans-serif,system-ui,Segoe UI,Roboto,Apple SD Gothic Neo,Pretendard,Malgun Gothic,sans-serif; color:var(--ink); background:var(--bg); }
-    a{ color:inherit; text-decoration:none; }
-
-    /* 공통 패널 */
-    .wrap{ max-width:1100px; margin:0 auto; padding:20px 16px 40px; }
-    .panel{ background:linear-gradient(180deg,#0b0e15,#0a0d16); border:1px solid #1e2340; border-radius:18px; box-shadow:0 12px 36px rgba(0,0,0,0.45); }
-
-    /* 헤더 */
-    header{ position:sticky; top:0; z-index:20; background:linear-gradient(180deg,#020305,#000 60%); border-bottom:1px solid #12162a; }
-    .bar{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; }
-    .brand{ display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.3px; }
-    .logo{ width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg,#2b6cff,#6dd3ff); box-shadow:0 0 16px rgba(109,211,255,0.35) inset; }
-
-    /* 홈(랜딩) */
-    #home{ margin-top:18px; padding:22px; }
-    .hero{ display:grid; gap:18px; justify-items:center; text-align:center; }
-    .title{ margin:6px 0 0; font-size:28px; font-weight:900; letter-spacing:.2px; }
-    .subtitle{ margin:0; color:var(--muted); }
-
-    .playBtn{ appearance:none; border:none; border-radius:16px; padding:16px 26px; font-weight:900; font-size:18px; cursor:pointer; background:var(--accent); color:white; box-shadow:0 8px 24px rgba(43,108,255,.35); transition: transform .08s ease, filter .2s ease; }
-    .playBtn:hover{ filter:brightness(1.08); }
-    .playBtn:active{ transform:translateY(1px); }
-
-    /* 덱/상점 섹션: 아래 직사각형을 이등분 */
-    .deckshop{ display:grid; grid-template-columns:1fr 1fr; gap:0; border-radius:16px; overflow:hidden; border:1px solid #1f2444; }
-    .pane{ padding:16px; min-height:140px; display:flex; align-items:flex-start; justify-content:space-between; }
-    .pane + .pane{ border-left:1px solid #1f2444; }
-    .pane h3{ margin:0; font-size:18px; }
-    .placeholder{ color:#8a90b8; font-size:13px; }
-
-    /* 게임 영역 */
-    #gameArea{ display:none; margin-top:20px; padding:14px; }
-    .layout{ display:grid; grid-template-columns: 320px 1fr 320px; gap:12px; }
-    .h{ font-size:14px; color:var(--muted); margin:0 0 8px; letter-spacing:0.3px; }
-
-    .mana{ height:14px; border-radius:8px; background:#12162a; border:1px solid #22274a; overflow:hidden; position:relative; }
-    .mana .fill{ background:linear-gradient(90deg,#4fc3f7,#6dd3ff); height:100%; width:0; transition: width .2s ease; }
-    .mana .txt{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; color:#dff6ff; text-shadow:0 1px 0 #000; }
-
-    .cards{ display:grid; grid-template-columns: repeat(3,1fr); gap:8px; }
-    .card{ background:linear-gradient(180deg,#161b30,#0f1325); border:1px solid #242b4f; border-radius:12px; padding:10px; cursor:pointer; box-shadow:inset 0 0 0 1px rgba(255,255,255,0.02); }
-    .card.sel{ outline:2px solid var(--accent-2); }
-    .card .name{ font-weight:800; margin-bottom:6px; }
-    .card .cost{ font-size:12px; color:var(--muted); }
-    .tip{ font-size:12px; color:var(--muted); margin-top:8px; line-height:1.4; }
-
-    .stage-wrap{ position:relative; border-radius:16px; overflow:hidden; border:1px solid #242846; background:#0a0d1c; }
-    canvas{ display:block; width:100%; height:auto; background:linear-gradient(180deg,#0d1225,#060912); }
-    .hud{ position:absolute; inset:8px; pointer-events:none; }
-    .bases{ display:flex; justify-content:space-between; font-weight:800; opacity:0.9; }
-
-    footer{ text-align:center; color:#7f86b5; font-size:12px; padding:24px 0 32px; }
-  </style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>하늘의 전쟁 — 홈</title>
+  <link rel="stylesheet" href="/css/sky.css"/>
 </head>
-<body>
-  <header>
-    <div class="bar wrap">
-      <div class="brand"><div class="logo"></div><div>카드 디펜스</div></div>
-    </div>
-  </header>
+<body class="sky">
+  <div class="topbar">
+    <div class="brand">하늘의 전쟁</div>
+    <div class="note">데모: 로컬에 가입정보 저장</div>
+  </div>
 
-  <main class="wrap">
-    <!-- 랜딩 화면 -->
-    <section id="home" class="panel">
-      <div class="hero">
-        <h1 class="title">카드 디펜스 게임</h1>
-        <p class="subtitle">파란색 <b>플레이</b> 버튼을 누르면 게임이 시작됩니다.</p>
-        <button id="btnPlay" class="playBtn" aria-label="플레이 버튼">플레이 ▶</button>
+  <div class="container">
+    <!-- 구름 장식 -->
+    <div class="cloud lg float1" style="top:14%; left:6%"></div>
+    <div class="cloud md float2" style="top:22%; right:12%"></div>
+    <div class="cloud sm float3" style="bottom:16%; left:18%"></div>
 
-        <!-- 아래 직사각형(이등분: 덱 / 상점) -->
-        <div class="deckshop panel" style="width:100%; max-width:860px;">
-          <div class="pane">
-            <h3>덱</h3>
-            <button id="btnDeck" class="btnSmall" style="margin-left:auto;">덱 열기</button>
-          </div>
-          <div class="pane">
-            <h3>상점</h3>
-            <span class="placeholder" style="margin-left:auto;">(추가 예정)</span>
-          </div>
-        </div>
-
-        <!-- 덱 편집기 -->
-        <section id="deckEditor" class="panel" style="display:none; width:100%; max-width:860px; padding:16px; text-align:left;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;">
-            <h3 style="margin:0;">덱 편집</h3>
-            <div style="display:flex; gap:8px;">
-              <button id="btnDeckSave" class="btnSmall">저장</button>
-              <button id="btnDeckClose" class="btnSmall" style="opacity:.9">닫기</button>
-            </div>
-          </div>
-
-          <!-- 위: 6장 배치 칸 -->
-          <div class="deckSlots" aria-label="덱 슬롯 6칸">
-            <div class="slot" data-idx="0"></div>
-            <div class="slot" data-idx="1"></div>
-            <div class="slot" data-idx="2"></div>
-            <div class="slot" data-idx="3"></div>
-            <div class="slot" data-idx="4"></div>
-            <div class="slot" data-idx="5"></div>
-          </div>
-          <p class="tip" style="margin:8px 2px 18px;">카드 칩을 클릭하면 빈 슬롯에 들어갑니다. 슬롯을 클릭하면 비워집니다.</p>
-
-          <!-- 아래: 획득/미획득 목록 -->
-          <h4 class="label">획득 카드</h4>
-          <div id="ownedCards" class="cardPool"></div>
-
-          <h4 class="label" style="margin-top:14px;">미획득 카드</h4>
-          <div id="lockedCards" class="cardPool locked"></div>
-        </section>
+    <section class="card" role="main">
+      <h1 class="title">하늘의 전쟁</h1>
+      <p class="sub">카드를 소환하고 레인에서 전투하는 2D 전략 게임(개발 예정)</p>
+      <div class="actions">
+        <a class="button" href="/signup.html">가입하기</a>
+        <a class="button secondary" href="/login.html">로그인</a>
       </div>
     </section>
+  </div>
+</body>
+</html>
 
-    <!-- 게임 화면 -->
-    <section id="gameArea" class="panel">
-      <div class="bar" style="padding:10px 12px 0;">
-        <div style="display:flex; gap:8px; align-items:center;">
-          <label class="h" style="margin-right:6px">모드</label>
-          <select id="mode">
-            <option value="single">싱글 (AI 대전)</option>
-            <option value="local2p">2인 로컬 (동일 기기)</option>
-          </select>
+
+<!-- =========================
+     File: /signup.html (가입)
+     ========================= -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>하늘의 전쟁 — 가입하기</title>
+  <link rel="stylesheet" href="/css/sky.css"/>
+</head>
+<body class="sky">
+  <div class="container">
+    <!-- 구름 3개 -->
+    <div class="cloud md float1" style="top:10%; left:10%"></div>
+    <div class="cloud sm float2" style="top:12%; right:18%"></div>
+    <div class="cloud sm float3" style="top:20%; left:50%"></div>
+
+    <section class="card">
+      <h1 class="title">가입하기</h1>
+      <p class="note">닉네임과 비밀번호를 입력하세요. (데모: 로컬 저장)</p>
+      <form id="form" class="row" autocomplete="off">
+        <div class="row">
+          <label>닉네임</label>
+          <input id="nickname" class="input" maxlength="20" placeholder="예: 하늘검객" required/>
         </div>
-        <div style="display:flex; gap:8px; align-items:center; margin-left:auto;">
-          <button id="btnReset">게임 재시작</button>
-          <button id="btnPause">일시정지</button>
+        <div class="row">
+          <label>비밀번호</label>
+          <input id="password" class="input" type="password" minlength="4" maxlength="32" placeholder="4~32자" required/>
         </div>
-      </div>
-
-      <div class="layout" style="padding:12px;">
-        <section>
-          <p class="h">플레이어 1 (좌측)</p>
-          <div class="mana" aria-label="P1 마나"><div id="p1Bar" class="fill"></div><div id="p1Txt" class="txt">0 / 10</div></div>
-          <div class="cards" id="p1Cards"></div>
-          <p class="tip">카드를 클릭하고, 좌측 절반의 원하는 <b>레인</b>을 클릭하여 소환하세요.</p>
-        </section>
-
-        <section class="stage-wrap">
-          <canvas id="game" width="960" height="540" aria-label="게임 캔버스"></canvas>
-          <div class="hud">
-            <div class="bases">
-              <div>▶ P1 베이스 HP: <span id="p1Base">100</span></div>
-              <div>P2 베이스 HP: <span id="p2Base">100</span> ◀</div>
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <p class="h">플레이어 2 (우측) / AI</p>
-          <div class="mana" aria-label="P2 마나"><div id="p2Bar" class="fill"></div><div id="p2Txt" class="txt">0 / 10</div></div>
-          <div class="cards" id="p2Cards"></div>
-          <p class="tip">2인 로컬 모드에서는 우측 절반의 레인을 클릭하여 소환합니다.<br>싱글 모드에서는 AI가 자동 소환합니다.</p>
-        </section>
-      </div>
-
-      <section class="panel" style="margin:12px; padding:12px;">
-        <h3 style="margin:6px 0 8px;">플레이 방법</h3>
-        <div style="font-size:14px; color:#cfd6ff; line-height:1.6;">
-          • 필드에는 <b>5개의 레인</b>이 있습니다. 좌측(P1) ↔ 우측(P2/AI)에서 유닛이 전진합니다.<br>
-          • 카드를 선택하고 자신의 <b>절반 필드</b>의 레인을 클릭하면 유닛이 소환됩니다.<br>
-          • 유닛이 상대 베이스에 도달하면 베이스 HP가 감소합니다. 상대 베이스 HP 0 → 승리!<br>
+        <div class="row">
+          <button class="button" type="submit">가입하기</button>
+          <a class="button secondary" href="/index.html">첫 화면으로</a>
         </div>
-      </section>
+        <div id="msg" class="note" aria-live="polite"></div>
+      </form>
     </section>
-  </main>
+  </div>
 
-  <footer>© 2025 카드 디펜스 — GitHub Pages 배포용 단일 파일</footer>
+  <script type="module">
+    import { nicknameExists, passwordExists, registerUser, show } from './js/user-store.js';
+    const $ = s=>document.querySelector(s);
+    const form = $('#form');
+    const msg = $('#msg');
+    form.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const nickname = $('#nickname').value.trim();
+      const password = $('#password').value;
+      if(!nickname || !password){ show(msg, '입력값을 확인해주세요.', 'error'); return; }
+
+      // 요구사항: 닉네임/비밀번호 모두 중복 체크
+      if(nicknameExists(nickname)){
+        show(msg, '이미 존재하는 닉네임입니다.', 'error');
+        return;
+      }
+      if(passwordExists(password)){
+        show(msg, '이미 존재하는 비밀번호입니다.', 'error');
+        return;
+      }
+
+      registerUser(nickname, password);
+      show(msg, '가입 완료! 첫 화면으로 이동합니다…', 'ok');
+      setTimeout(()=> location.href = '/index.html', 900);
+    });
+  </script>
+</body>
+</html>
+
+
+<!-- =========================
+     File: /login.html (로그인)
+     ========================= -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>하늘의 전쟁 — 로그인</title>
+  <link rel="stylesheet" href="/css/sky.css"/>
+</head>
+<body class="sky">
+  <div class="container">
+    <!-- 구름 3개 -->
+    <div class="cloud md float1" style="top:10%; left:12%"></div>
+    <div class="cloud sm float2" style="top:14%; right:14%"></div>
+    <div class="cloud sm float3" style="top:24%; left:56%"></div>
+
+    <section class="card">
+      <h1 class="title">로그인</h1>
+      <p class="note">가입 시 사용한 닉네임과 비밀번호를 입력하세요.</p>
+      <form id="form" class="row" autocomplete="off">
+        <div class="row">
+          <label>닉네임</label>
+          <input id="nickname" class="input" maxlength="20" required/>
+        </div>
+        <div class="row">
+          <label>비밀번호</label>
+          <input id="password" class="input" type="password" minlength="4" maxlength="32" required/>
+        </div>
+        <div class="row">
+          <button class="button" type="submit">로그인</button>
+          <a class="button secondary" href="/index.html">첫 화면으로</a>
+        </div>
+        <div id="msg" class="note" aria-live="polite"></div>
+      </form>
+    </section>
+  </div>
+
+  <script type="module">
+    import { validateLogin, show } from './js/user-store.js';
+    const $ = s=>document.querySelector(s);
+    const form = $('#form');
+    const msg = $('#msg');
+    form.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const nickname = $('#nickname').value.trim();
+      const password = $('#password').value;
+      if(validateLogin(nickname, password)){
+        show(msg, '로그인 성공! 전장으로 이동합니다…', 'ok');
+        // 다음 페이지로 이동(하늘색+구름 배경 유지)
+        setTimeout(()=> location.href = '/welcome.html#'+encodeURIComponent(nickname), 700);
+      }else{
+        show(msg, '닉네임 또는 비밀번호가 일치하지 않습니다.', 'error');
+      }
+    });
+  </script>
+</body>
+</html>
+
+
+<!-- =========================
+     File: /welcome.html (로그인 성공 후)
+     ========================= -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>하늘의 전쟁 — 전장 대기실</title>
+  <link rel="stylesheet" href="/css/sky.css"/>
+</head>
+<body class="sky">
+  <div class="topbar">
+    <div class="brand">하늘의 전쟁</div>
+    <a class="button secondary" href="/index.html">로그아웃</a>
+  </div>
+
+  <div class="container">
+    <div class="cloud lg float1" style="top:12%; left:8%"></div>
+    <div class="cloud md float2" style="top:22%; right:10%"></div>
+    <div class="cloud sm float3" style="bottom:18%; left:20%"></div>
+
+    <section class="card" role="main">
+      <h1 class="title" id="hello">전장 대기실</h1>
+      <p class="sub">하늘색 배경과 구름을 갖춘 2D 전장의 시작점입니다. (다음 단계: 레인, 카드 소환 UI)</p>
+      <div class="actions">
+        <a class="button" href="#" onclick="alert('다음 단계에서 전장으로 이동하게 만들게요!')">전장으로</a>
+      </div>
+    </section>
+  </div>
 
   <script>
-    // --- 덱 에디터 데이터 ---------------------------------------------------
-    const CARD_DB = [
-      { key:'knight', name:'기사',   cost:4, hp:40, dps:6,  range:28,  speed:36, type:'melee' },
-      { key:'archer', name:'궁수',   cost:6, hp:24, dps:8,  range:180, speed:24, type:'ranged' },
-      { key:'mage',   name:'메이지', cost:7, hp:22, dps:11, range:150, speed:20, type:'ranged' },
-      // 미획득 예시 카드
-      { key:'tank',   name:'탱커',  cost:5, hp:70, dps:3,  range:24,  speed:22, type:'melee', locked:true },
-      { key:'healer', name:'힐러',  cost:6, hp:28, dps:0,  range:120, speed:20, type:'support', locked:true },
-      { key:'rogue',  name:'도적',  cost:5, hp:26, dps:10, range:40,  speed:40, type:'melee', locked:true },
-    ];
-
-    const DECK_SIZE = 6;
-    let deck = JSON.parse(localStorage.getItem('deck')||'[]');
-    if(!Array.isArray(deck) || deck.length!==DECK_SIZE){ deck = Array(DECK_SIZE).fill(null); }
-
-    // --- 요소 참조 -----------------------------------------------------------
-    const home = document.getElementById('home');
-    const gameArea = document.getElementById('gameArea');
-    const btnPlay = document.getElementById('btnPlay');
-
-    const deckEditor = document.getElementById('deckEditor');
-    const btnDeck = document.getElementById('btnDeck');
-    const btnDeckSave = document.getElementById('btnDeckSave');
-    const btnDeckClose = document.getElementById('btnDeckClose');
-
-    const ownedWrap  = document.getElementById('ownedCards');
-    const lockedWrap = document.getElementById('lockedCards');
-
-    // --- 유틸 DOM ----------------------------------------------------------
-    function makeChip(card, locked=false){
-      const el = document.createElement('button');
-      el.className = 'chip' + (locked? ' locked':'' );
-      el.type = 'button';
-      el.textContent = card.name + (locked? ' (미획득)':'' );
-      if(!locked){
-        el.addEventListener('click', ()=>{
-          const idx = deck.findIndex(x=>!x);
-          if(idx===-1){ alert('덱이 가득 찼습니다. (6장) 슬롯을 비우고 다시 추가하세요.'); return; }
-          deck[idx] = card.key; renderDeckSlots();
-        });
-      }
-      return el;
+    // 로그인 페이지에서 전달한 닉네임 표시
+    const nick = decodeURIComponent(location.hash.slice(1)||'');
+    if(nick){
+      const el = document.getElementById('hello');
+      el.textContent = `어서오세요, ${nick} 님!`;
     }
-
-    function renderDeckEditor(){
-      // 획득/미획득 리스트
-      const owned = CARD_DB.filter(c=>!c.locked);
-      const locked = CARD_DB.filter(c=> c.locked);
-      ownedWrap.replaceChildren(...owned.map(c=>makeChip(c,false)));
-      lockedWrap.replaceChildren(...locked.map(c=>makeChip(c,true)));
-      renderDeckSlots();
-    }
-
-    function renderDeckSlots(){
-      const slots = deckEditor.querySelectorAll('.slot');
-      slots.forEach((s,i)=>{
-        const key = deck[i];
-        s.textContent = key ? (CARD_DB.find(c=>c.key===key)?.name||key) : '빈 슬롯';
-        s.classList.toggle('filled', !!key);
-      });
-    }
-
-    // 슬롯 클릭 → 비우기
-    deckEditor?.addEventListener('click', (e)=>{
-      const box = e.target.closest('.slot');
-      if(!box) return;
-      const idx = +box.dataset.idx;
-      deck[idx] = null; renderDeckSlots();
-    });
-
-    btnDeck?.addEventListener('click', ()=>{ deckEditor.style.display='block'; renderDeckEditor(); });
-    btnDeckClose?.addEventListener('click', ()=>{ deckEditor.style.display='none'; });
-    btnDeckSave?.addEventListener('click', ()=>{ localStorage.setItem('deck', JSON.stringify(deck)); alert('덱이 저장되었습니다.'); });
-
-    // --- 홈 → 게임 전환 ---------------------------------------------------
-    btnPlay.addEventListener('click', ()=>{ home.style.display='none'; gameArea.style.display='block'; reset(); });
-
-    // --- 게임 상수/유틸 ----------------------------------------------------
-    const W = 960, H = 540;
-    const LANES = 5;
-    const GRID_TOP = 80, GRID_BOTTOM = H - 20, GRID_LEFT = 40, GRID_RIGHT = W - 40;
-    const BASE_HP_MAX = 100;
-    const MAX_MANA = 10;
-
-    const CARD_DEFS = [
-      { key:'knight', name:'기사(Knight)', cost:4, hp:40, dps:6, range:28, speed:36, attackCd:0.6, color:'#9bdc6a', type:'melee' },
-      { key:'archer', name:'궁수(Archer)', cost:6, hp:24, dps:8, range:180, speed:24, attackCd:0.9, color:'#6dd3ff', type:'ranged' },
-      { key:'mage',   name:'메이지(Mage)',   cost:7, hp:22, dps:11,range:150, speed:20, attackCd:1.1,color:'#dda6ff', type:'ranged' },
-    ];
-
-    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-
-    // --- 상태 ---------------------------------------------------------------
-    const state = {
-      mode: 'single', // 'single' | 'local2p'
-      running: true,
-      last: 0,
-      p1: { mana: 0, baseHp: BASE_HP_MAX, sel:null },
-      p2: { mana: 0, baseHp: BASE_HP_MAX, sel:null },
-      units: [], // {side:'p1'|'p2', lane:0..4, x:number, hp, cd:number, def: CARD_DEF}
-      projectiles: [] // for ranged attacks
-    };
-
-    // --- DOM ----------------------------------------------------------------
-    const modeSel = document.getElementById('mode');
-    const p1Bar = document.getElementById('p1Bar');
-    const p2Bar = document.getElementById('p2Bar');
-    const p1Txt = document.getElementById('p1Txt');
-    const p2Txt = document.getElementById('p2Txt');
-    const p1BaseTxt = document.getElementById('p1Base');
-    const p2BaseTxt = document.getElementById('p2Base');
-    const btnReset = document.getElementById('btnReset');
-    const btnPause = document.getElementById('btnPause');
-    const p1Cards = document.getElementById('p1Cards');
-    const p2Cards = document.getElementById('p2Cards');
-
-    const cvs = document.getElementById('game');
-    const ctx = cvs.getContext('2d');
-
-    // --- UI: 카드 생성 ------------------------------------------------------
-    function renderCards(){
-      // 덱 우선: 덱이 비어있지 않으면 덱에 들어있는 카드만 표시
-      const selectedKeys = deck.filter(Boolean);
-      const src = selectedKeys.length? CARD_DB.filter(c=> selectedKeys.includes(c.key))
-                                     : CARD_DB.filter(c=> !c.locked); // 기본: 획득 카드
-      function makeCardEl(owner){
-        return src.map((d)=>{
-          // 게임용 상세(def) 찾기
-          const def = CARD_DEFS.find(x=>x.key===d.key) || { name:d.name, cost:5, hp:20, dps:5, range:40, speed:30, attackCd:0.9, type:'melee' };
-          const el = document.createElement('div');
-          el.className = 'card';
-          el.dataset.key = def.key || d.key;
-          el.innerHTML = `<div class="name">${def.name}</div><div class=\"cost\">코스트 ${def.cost} • ${(def.type==='ranged')?'원거리':'근접'}</div>`;
-          el.addEventListener('click', ()=>{
-            const side = owner==='p1'? state.p1 : state.p2;
-            const parent = owner==='p1'? p1Cards : p2Cards;
-            if(side.sel=== (def.key||d.key)){ side.sel=null; } else { side.sel=(def.key||d.key); }
-            [...parent.children].forEach(c=>c.classList.toggle('sel', c.dataset.key===side.sel));
-          });
-          return el;
-        });
-      }
-      p1Cards.replaceChildren(...makeCardEl('p1'));
-      p2Cards.replaceChildren(...makeCardEl('p2'));
-    }
-
-    // --- 좌표 & 레인 --------------------------------------------------------
-    const laneY = i => GRID_TOP + (i+0.5) * ((GRID_BOTTOM-GRID_TOP)/LANES);
-    const p1SpawnX = GRID_LEFT + 20;
-    const p2SpawnX = GRID_RIGHT - 20;
-
-    function worldToLane(y){
-      const h = (GRID_BOTTOM-GRID_TOP)/LANES;
-      return clamp(Math.floor((y - GRID_TOP)/h), 0, LANES-1);
-    }
-
-    // --- 유닛/전투 로직 -----------------------------------------------------
-    function spawn(side, key, lane){
-      const def = CARD_DEFS.find(c=>c.key===key);
-      if(!def) return false;
-      const owner = side==='p1'? state.p1 : state.p2;
-      if(owner.mana < def.cost) return false;
-      owner.mana -= def.cost;
-      owner.sel = null; // 사용 후 선택 해제
-      const x = side==='p1' ? p1SpawnX : p2SpawnX;
-      state.units.push({ side, lane, x, hp:def.hp, cd:0, def });
-      // 선택 하이라이트 해제
-      const parent = side==='p1'? p1Cards : p2Cards;
-      [...parent.children].forEach(c=>c.classList.remove('sel'));
-      return true;
-    }
-
-    function findTarget(me){
-      // 같은 레인, 반대 진영, 사거리 내 가장 가까운 적
-      let best=null, bestDist=1e9;
-      for(const u of state.units){
-        if(u===me) continue;
-        if(u.lane!==me.lane) continue;
-        if(u.side===me.side) continue;
-        const dist = Math.abs(u.x - me.x);
-        if(dist <= me.def.range && dist < bestDist){ best=u; bestDist=dist; }
-      }
-      return best;
-    }
-
-    function updateUnits(dt){
-      // 공격/이동
-      for(const u of state.units){
-        u.cd = Math.max(0, u.cd - dt);
-        const target = findTarget(u);
-        if(target){
-          // 사거리 내: 공격
-          if(u.cd<=0){
-            if(u.def.type==='ranged'){
-              state.projectiles.push({ x:u.x, y: laneY(u.lane), vx: (u.side==='p1'? 1:-1)*240, dmg:u.def.dps, side:u.side });
-            } else {
-              target.hp -= u.def.dps; // 근접 즉시 타격 (초당 dps, cd로 절대량 관리)
-            }
-            u.cd = u.def.attackCd;
-          }
-        } else {
-          // 전진
-          const dir = u.side==='p1'? 1 : -1;
-          u.x += dir * u.def.speed * dt;
-        }
-      }
-
-      // 투사체 이동/피격
-      for(const p of state.projectiles){ p.x += p.vx * dt; }
-      // 명중 판정 (같은 레인, 가장 가까운 적과의 x 교차)
-      for(const p of state.projectiles){
-        let hit=null, hitDist=9999;
-        for(const u of state.units){
-          if(u.side===p.side) continue;
-          if(Math.abs(laneY(u.lane) - p.y)>20) continue;
-          const d = Math.abs(u.x - p.x);
-          if(d < 16 && d < hitDist){ hit=u; hitDist=d; }
-        }
-        if(hit){ hit.hp -= p.dmg; p.dead=true; }
-        if(p.x < GRID_LEFT-40 || p.x > GRID_RIGHT+40) p.dead=true;
-      }
-      state.projectiles = state.projectiles.filter(p=>!p.dead);
-
-      // 베이스 도달
-      for(const u of state.units){
-        if(u.side==='p1' && u.x >= GRID_RIGHT-8){ state.p2.baseHp = Math.max(0, state.p2.baseHp-5); u.hp=0; }
-        if(u.side==='p2' && u.x <= GRID_LEFT+8){ state.p1.baseHp = Math.max(0, state.p1.baseHp-5); u.hp=0; }
-      }
-
-      // 사망 제거
-      state.units = state.units.filter(u=>u.hp>0);
-    }
-
-    // --- 마나/AI ------------------------------------------------------------
-    let aiTimer = 0;
-    function updateMana(dt){
-      const regen = 1.2; // 초당 1.2 마나
-      state.p1.mana = clamp(state.p1.mana + regen*dt, 0, MAX_MANA);
-      state.p2.mana = clamp(state.p2.mana + regen*dt, 0, MAX_MANA);
-    }
-    function runAI(dt){
-      if(state.mode!=='single') return;
-      aiTimer -= dt;
-      if(aiTimer<=0){
-        aiTimer = 0.9 + Math.random()*0.9; // 0.9~1.8초 간격
-        // 간단한 전략: 우리 쪽 레인에 적이 많은 곳을 우선 보강
-        const lanes = [...Array(LANES)].map((_,i)=>i);
-        const prio = lanes.sort((a,b)=> countP1(a)-countP1(b)); // P1 유닛이 많은 레인을 먼저 방어
-        const choice = CARD_DB.filter(c=>!c.locked).reverse().find(c=> state.p2.mana>= (CARD_DB.find(x=>x.key===c.key)?.cost||5) );
-        // AI는 실제 전투 파라미터 테이블(CARD_DEFS) 기준 스폰 시도
-        const spawnKey = (choice && ['knight','archer','mage'].includes(choice.key)) ? choice.key : 'knight';
-        const lane = prio[0];
-        spawn('p2', spawnKey, lane);
-      }
-    }
-    function countP1(lane){ return state.units.filter(u=>u.side==='p1' && u.lane===lane).length; }
-
-    // --- 렌더링 --------------------------------------------------------------
-    function render(){
-      const ctx = cvs.getContext('2d');
-      ctx.clearRect(0,0,W,H);
-      // 배경 격자
-      ctx.save();
-      const gH = (GRID_BOTTOM-GRID_TOP)/LANES;
-      for(let i=0;i<LANES;i++){
-        const y = laneY(i);
-        ctx.strokeStyle = 'rgba(120,140,200,0.12)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(GRID_LEFT, y);
-        ctx.lineTo(GRID_RIGHT, y);
-        ctx.stroke();
-      }
-      // 중앙선
-      ctx.strokeStyle = 'rgba(120,140,200,0.18)';
-      ctx.setLineDash([6,6]);
-      ctx.beginPath(); ctx.moveTo(W/2, GRID_TOP-8); ctx.lineTo(W/2, GRID_BOTTOM+8); ctx.stroke();
-      ctx.setLineDash([]);
-
-      // 베이스 영역
-      ctx.fillStyle = 'rgba(100,200,255,0.06)';
-      ctx.fillRect(GRID_LEFT-12, GRID_TOP-8, 26, GRID_BOTTOM-GRID_TOP+16);
-      ctx.fillStyle = 'rgba(255,120,160,0.06)';
-      ctx.fillRect(GRID_RIGHT-14, GRID_TOP-8, 26, GRID_BOTTOM-GRID_TOP+16);
-
-      // 유닛
-      for(const u of state.units){
-        const y = laneY(u.lane);
-        const isP1 = u.side==='p1';
-        ctx.fillStyle = isP1 ? '#6dd3ff' : '#ff8ab0';
-        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(u.x, y, 12, 0, Math.PI*2);
-        ctx.fill(); ctx.stroke();
-        const hpw = 30, hph = 6;
-        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(u.x-hpw/2, y-20, hpw, hph);
-        const hpRatio = clamp(u.hp/u.def.hp, 0, 1);
-        ctx.fillStyle = isP1? '#78ffd6' : '#ffd1e1';
-        ctx.fillRect(u.x-hpw/2, y-20, hpw*hpRatio, hph);
-      }
-
-      // 투사체
-      for(const p of state.projectiles){
-        ctx.fillStyle = p.side==='p1'? '#b6f3ff' : '#ffc1d1';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
-        ctx.fill();
-      }
-
-      ctx.restore();
-
-      // HUD 갱신
-      p1BaseTxt.textContent = Math.round(state.p1.baseHp);
-      p2BaseTxt.textContent = Math.round(state.p2.baseHp);
-      const p1Ratio = state.p1.mana / MAX_MANA;
-      const p2Ratio = state.p2.mana / MAX_MANA;
-      p1Bar.style.width = (p1Ratio*100).toFixed(1)+'%';
-      p2Bar.style.width = (p2Ratio*100).toFixed(1)+'%';
-      p1Txt.textContent = `${Math.floor(state.p1.mana)} / ${MAX_MANA}`;
-      p2Txt.textContent = `${Math.floor(state.p2.mana)} / ${MAX_MANA}`;
-
-      if(state.p1.baseHp<=0 || state.p2.baseHp<=0){
-        ctx.save();
-        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,H);
-        ctx.fillStyle = '#fff'; ctx.font = 'bold 42px system-ui, sans-serif'; ctx.textAlign='center';
-        ctx.fillText(state.p1.baseHp<=0? '패배... 다시 도전!' : '승리! 축하합니다!', W/2, H/2);
-        ctx.restore();
-        state.running=false;
-      }
-    }
-
-    // --- 입력: 캔버스 클릭으로 소환 ----------------------------------------
-    const cvs = document.getElementById('game');
-    cvs.addEventListener('click', (e)=>{
-      if(!state.running) return;
-      const rect = cvs.getBoundingClientRect();
-      const sx = (e.clientX - rect.left) * (W / rect.width);
-      const sy = (e.clientY - rect.top) * (H / rect.height);
-      const lane = worldToLane(sy);
-      const leftHalf = sx < W/2;
-      if(leftHalf){
-        const sel = state.p1.sel; if(!sel) return; spawn('p1', sel, lane);
-      } else {
-        if(state.mode==='local2p'){
-          const sel = state.p2.sel; if(!sel) return; spawn('p2', sel, lane);
-        }
-      }
-    });
-
-    // --- 루프 ---------------------------------------------------------------
-    function loop(ts){
-      const t = ts * 0.001;
-      const dt = state.last? (t - state.last) : 0; 
-      state.last = t;
-      if(state.running){
-        updateMana(dt);
-        runAI(dt);
-        updateUnits(dt);
-        render();
-      }
-      requestAnimationFrame(loop);
-    }
-
-    // --- 모드/리셋 ----------------------------------------------------------
-    function reset(){
-      state.running = true; state.last=0; aiTimer=0;
-      state.p1.mana=5; state.p2.mana=5;
-      state.p1.baseHp = BASE_HP_MAX; state.p2.baseHp = BASE_HP_MAX;
-      state.units.length=0; state.projectiles.length=0;
-      state.p1.sel = null; state.p2.sel = null;
-      renderCards();
-      render();
-    }
-
-    const modeSelEl = document.getElementById('mode');
-    const btnResetEl = document.getElementById('btnReset');
-    const btnPauseEl = document.getElementById('btnPause');
-    if(modeSelEl) modeSelEl.addEventListener('change', ()=>{ state.mode = modeSelEl.value; reset(); });
-    if(btnResetEl) btnResetEl.addEventListener('click', reset);
-    if(btnPauseEl) btnPauseEl.addEventListener('click', ()=>{ state.running = !state.running; btnPauseEl.textContent = state.running? '일시정지' : '계속하기'; });
-
-    // 초기 렌더(홈 상태)
-    renderCards();
-    state.mode = (modeSelEl? modeSelEl.value : 'single');
-    requestAnimationFrame(loop);
   </script>
 </body>
 </html>
