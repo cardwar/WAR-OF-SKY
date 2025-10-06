@@ -5,99 +5,153 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>카드 디펜스 MVP</title>
   <style>
-    :root{ --ui-bg:#0f1220; --panel:#171a2a; --ink:#e6e8ff; --muted:#9aa1c6; --accent:#6dd3ff; --good:#3ad07a; --bad:#ff5a7a; --warn:#ffd166; }
+    :root{ --bg:#000; --panel:#0f1220; --ink:#e6e8ff; --muted:#9aa1c6; --accent:#2b6cff; --accent-2:#6dd3ff; --good:#3ad07a; --bad:#ff5a7a; }
     *{ box-sizing:border-box; }
-    body{ margin:0; font-family: ui-sans-serif,system-ui,Segoe UI,Roboto,Apple Color Emoji,Noto Color Emoji,Apple SD Gothic Neo,Pretendard,Malgun Gothic,sans-serif; color:var(--ink); background: radial-gradient(1200px 800px at 50% -200px, #1a1f37 0%, #0b0e1a 70%);}    
-    header{ display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid #242846; background:linear-gradient(180deg,#111424,#0b0e1a); position:sticky; top:0; z-index:10; }
-    .brand{ display:flex; gap:10px; align-items:center; font-weight:800; letter-spacing:0.3px; }
-    .brand .logo{ width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg,#6dd3ff,#7d76ff); box-shadow:0 0 16px rgba(109,211,255,0.5) inset; }
-    .controls{ display:flex; gap:8px; align-items:center; }
-    select,button{ background:var(--panel); color:var(--ink); border:1px solid #2a2f4f; border-radius:10px; padding:8px 12px; font-weight:600; cursor:pointer; }
-    button:hover{ border-color:#3a4170; }
-    .layout{ display:grid; grid-template-columns: 320px 1fr 320px; gap:12px; padding:12px; }
-    .panel{ background:rgba(18,22,38,0.8); border:1px solid #232744; border-radius:16px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,0.35); }
+    body{ margin:0; font-family: ui-sans-serif,system-ui,Segoe UI,Roboto,Apple SD Gothic Neo,Pretendard,Malgun Gothic,sans-serif; color:var(--ink); background:var(--bg); }
+    a{ color:inherit; text-decoration:none; }
+
+    /* 공통 패널 */
+    .wrap{ max-width:1100px; margin:0 auto; padding:20px 16px 40px; }
+    .panel{ background:linear-gradient(180deg,#0b0e15,#0a0d16); border:1px solid #1e2340; border-radius:18px; box-shadow:0 12px 36px rgba(0,0,0,0.45); }
+
+    /* 헤더 */
+    header{ position:sticky; top:0; z-index:20; background:linear-gradient(180deg,#020305,#000 60%); border-bottom:1px solid #12162a; }
+    .bar{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.3px; }
+    .logo{ width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg,#2b6cff,#6dd3ff); box-shadow:0 0 16px rgba(109,211,255,0.35) inset; }
+
+    /* 홈(랜딩) */
+    #home{ margin-top:18px; padding:22px; }
+    .hero{ display:grid; gap:18px; justify-items:center; text-align:center; }
+    .title{ margin:6px 0 0; font-size:28px; font-weight:900; letter-spacing:.2px; }
+    .subtitle{ margin:0; color:var(--muted); }
+
+    .playBtn{ appearance:none; border:none; border-radius:16px; padding:16px 26px; font-weight:900; font-size:18px; cursor:pointer; background:var(--accent); color:white; box-shadow:0 8px 24px rgba(43,108,255,.35); transition: transform .08s ease, filter .2s ease; }
+    .playBtn:hover{ filter:brightness(1.08); }
+    .playBtn:active{ transform:translateY(1px); }
+
+    /* 덱/상점 섹션: 아래 직사각형을 이등분 */
+    .deckshop{ display:grid; grid-template-columns:1fr 1fr; gap:0; border-radius:16px; overflow:hidden; border:1px solid #1f2444; }
+    .pane{ padding:16px; min-height:140px; display:flex; align-items:flex-start; justify-content:space-between; }
+    .pane + .pane{ border-left:1px solid #1f2444; }
+    .pane h3{ margin:0; font-size:18px; }
+    .placeholder{ color:#8a90b8; font-size:13px; }
+
+    /* 게임 영역 */
+    #gameArea{ display:none; margin-top:20px; padding:14px; }
+    .layout{ display:grid; grid-template-columns: 320px 1fr 320px; gap:12px; }
     .h{ font-size:14px; color:var(--muted); margin:0 0 8px; letter-spacing:0.3px; }
-    .mana{ height:14px; border-radius:8px; background:#1a1f2f; border:1px solid #2a2f4f; overflow:hidden; position:relative; }
+
+    .mana{ height:14px; border-radius:8px; background:#12162a; border:1px solid #22274a; overflow:hidden; position:relative; }
     .mana .fill{ background:linear-gradient(90deg,#4fc3f7,#6dd3ff); height:100%; width:0; transition: width .2s ease; }
     .mana .txt{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; color:#dff6ff; text-shadow:0 1px 0 #000; }
 
-    /* 카드 바 */
     .cards{ display:grid; grid-template-columns: repeat(3,1fr); gap:8px; }
-    .card{ background:linear-gradient(180deg,#181d34,#0f1325); border:1px solid #2a2f4f; border-radius:12px; padding:10px; cursor:pointer; box-shadow:inset 0 0 0 1px rgba(255,255,255,0.02); }
-    .card.sel{ outline:2px solid var(--accent); }
+    .card{ background:linear-gradient(180deg,#161b30,#0f1325); border:1px solid #242b4f; border-radius:12px; padding:10px; cursor:pointer; box-shadow:inset 0 0 0 1px rgba(255,255,255,0.02); }
+    .card.sel{ outline:2px solid var(--accent-2); }
     .card .name{ font-weight:800; margin-bottom:6px; }
     .card .cost{ font-size:12px; color:var(--muted); }
     .tip{ font-size:12px; color:var(--muted); margin-top:8px; line-height:1.4; }
 
-    /* 캔버스 */
-    .stage-wrap{ position:relative; border-radius:16px; overflow:hidden; border:1px solid #242846; }
-    canvas{ display:block; width:100%; height:auto; background:linear-gradient(180deg,#101428,#0a0d1c); }
+    .stage-wrap{ position:relative; border-radius:16px; overflow:hidden; border:1px solid #242846; background:#0a0d1c; }
+    canvas{ display:block; width:100%; height:auto; background:linear-gradient(180deg,#0d1225,#060912); }
     .hud{ position:absolute; inset:8px; pointer-events:none; }
     .bases{ display:flex; justify-content:space-between; font-weight:800; opacity:0.9; }
 
-    .howto{ font-size:14px; line-height:1.6; color:#cfd6ff; }
-    .kbd{ display:inline-block; padding:2px 6px; border:1px solid #2a2f4f; border-radius:6px; background:#12162a; font-size:12px; }
-
-    footer{ text-align:center; color:#7f86b5; font-size:12px; padding:10px 0 20px; }
+    footer{ text-align:center; color:#7f86b5; font-size:12px; padding:24px 0 32px; }
   </style>
 </head>
 <body>
   <header>
-    <div class="brand"><div class="logo"></div><div>카드 디펜스 MVP</div></div>
-    <div class="controls">
-      <label class="h" style="margin-right:6px">모드</label>
-      <select id="mode">
-        <option value="single">싱글 (AI 대전)</option>
-        <option value="local2p">2인 로컬 (동일 기기)</option>
-      </select>
-      <button id="btnReset">게임 재시작</button>
-      <button id="btnPause">일시정지</button>
+    <div class="bar wrap">
+      <div class="brand"><div class="logo"></div><div>카드 디펜스</div></div>
     </div>
   </header>
 
-  <main class="layout">
-    <!-- 좌측: 플레이어1 패널 -->
-    <section class="panel">
-      <p class="h">플레이어 1 (좌측)</p>
-      <div class="mana" aria-label="P1 마나"><div id="p1Bar" class="fill"></div><div id="p1Txt" class="txt">0 / 10</div></div>
-      <div class="cards" id="p1Cards"></div>
-      <p class="tip">카드를 클릭하고, 좌측 절반의 원하는 <b>레인</b>을 클릭하여 소환하세요.</p>
-    </section>
+  <main class="wrap">
+    <!-- 랜딩 화면 -->
+    <section id="home" class="panel">
+      <div class="hero">
+        <h1 class="title">카드 디펜스 게임</h1>
+        <p class="subtitle">파란색 <b>플레이</b> 버튼을 누르면 게임이 시작됩니다.</p>
+        <button id="btnPlay" class="playBtn" aria-label="플레이 버튼">플레이 ▶</button>
 
-    <!-- 중앙: 게임 스테이지 -->
-    <section class="panel stage-wrap">
-      <canvas id="game" width="960" height="540" aria-label="게임 캔버스"></canvas>
-      <div class="hud">
-        <div class="bases">
-          <div>▶ P1 베이스 HP: <span id="p1Base">100</span></div>
-          <div>P2 베이스 HP: <span id="p2Base">100</span> ◀</div>
+        <!-- 아래 직사각형(이등분: 덱 / 상점) -->
+        <div class="deckshop panel" style="width:100%; max-width:860px;">
+          <div class="pane">
+            <h3>덱</h3>
+            <span class="placeholder">(추가 예정: 보유 카드, 편성/정렬)</span>
+          </div>
+          <div class="pane">
+            <h3>상점</h3>
+            <span class="placeholder">(추가 예정: 카드 구매/업그레이드)</span>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- 우측: 플레이어2 패널 (로컬2P용) / AI 정보 -->
-    <section class="panel">
-      <p class="h">플레이어 2 (우측) / AI</p>
-      <div class="mana" aria-label="P2 마나"><div id="p2Bar" class="fill"></div><div id="p2Txt" class="txt">0 / 10</div></div>
-      <div class="cards" id="p2Cards"></div>
-      <p class="tip">2인 로컬 모드에서는 우측 절반의 레인을 클릭하여 소환합니다.<br>싱글 모드에서는 AI가 자동 소환합니다.</p>
+    <!-- 게임 화면 -->
+    <section id="gameArea" class="panel">
+      <div class="bar" style="padding:10px 12px 0;">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <label class="h" style="margin-right:6px">모드</label>
+          <select id="mode">
+            <option value="single">싱글 (AI 대전)</option>
+            <option value="local2p">2인 로컬 (동일 기기)</option>
+          </select>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; margin-left:auto;">
+          <button id="btnReset">게임 재시작</button>
+          <button id="btnPause">일시정지</button>
+        </div>
+      </div>
+
+      <div class="layout" style="padding:12px;">
+        <section>
+          <p class="h">플레이어 1 (좌측)</p>
+          <div class="mana" aria-label="P1 마나"><div id="p1Bar" class="fill"></div><div id="p1Txt" class="txt">0 / 10</div></div>
+          <div class="cards" id="p1Cards"></div>
+          <p class="tip">카드를 클릭하고, 좌측 절반의 원하는 <b>레인</b>을 클릭하여 소환하세요.</p>
+        </section>
+
+        <section class="stage-wrap">
+          <canvas id="game" width="960" height="540" aria-label="게임 캔버스"></canvas>
+          <div class="hud">
+            <div class="bases">
+              <div>▶ P1 베이스 HP: <span id="p1Base">100</span></div>
+              <div>P2 베이스 HP: <span id="p2Base">100</span> ◀</div>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <p class="h">플레이어 2 (우측) / AI</p>
+          <div class="mana" aria-label="P2 마나"><div id="p2Bar" class="fill"></div><div id="p2Txt" class="txt">0 / 10</div></div>
+          <div class="cards" id="p2Cards"></div>
+          <p class="tip">2인 로컬 모드에서는 우측 절반의 레인을 클릭하여 소환합니다.<br>싱글 모드에서는 AI가 자동 소환합니다.</p>
+        </section>
+      </div>
+
+      <section class="panel" style="margin:12px; padding:12px;">
+        <h3 style="margin:6px 0 8px;">플레이 방법</h3>
+        <div style="font-size:14px; color:#cfd6ff; line-height:1.6;">
+          • 필드에는 <b>5개의 레인</b>이 있습니다. 좌측(P1) ↔ 우측(P2/AI)에서 유닛이 전진합니다.<br>
+          • 카드를 선택하고 자신의 <b>절반 필드</b>의 레인을 클릭하면 유닛이 소환됩니다.<br>
+          • 유닛이 상대 베이스에 도달하면 베이스 HP가 감소합니다. 상대 베이스 HP 0 → 승리!<br>
+        </div>
+      </section>
     </section>
   </main>
 
-  <section class="panel" style="margin:0 12px;">
-    <h3 style="margin:6px 0 8px;">플레이 방법 (How to Play)</h3>
-    <div class="howto">
-      • 필드에는 <b>5개의 레인</b>이 있습니다. 좌측(P1) ↔ 우측(P2/AI)에서 유닛이 전진합니다.<br>
-      • 카드를 선택하고 자신의 <b>절반 필드</b>의 레인을 클릭하면 유닛이 소환됩니다.<br>
-      • 유닛은 사거리 내 적을 만나면 <b>이동을 멈추고 공격</b>합니다. 적이 없으면 전진합니다.<br>
-      • 유닛이 상대 베이스에 도달하면 <b>베이스 HP</b>가 감소합니다. 상대 베이스 HP를 0으로 만들면 승리!<br>
-      • <span class="kbd">게임 재시작</span>으로 언제든 초기화할 수 있습니다. <span class="kbd">일시정지</span>로 멈춤/재개.
-    </div>
-  </section>
-
-  <footer>© 2025 카드 디펜스 예제 — GitHub Pages에 바로 올릴 수 있는 단일 파일 MVP</footer>
+  <footer>© 2025 카드 디펜스 — GitHub Pages 배포용 단일 파일</footer>
 
   <script>
+    // --- 홈 → 게임 전환 ---------------------------------------------------
+    const home = document.getElementById('home');
+    const gameArea = document.getElementById('gameArea');
+    const btnPlay = document.getElementById('btnPlay');
+    btnPlay.addEventListener('click', ()=>{ home.style.display='none'; gameArea.style.display='block'; reset(); });
+
     // --- 게임 상수/유틸 ----------------------------------------------------
     const W = 960, H = 540;
     const LANES = 5;
@@ -147,7 +201,7 @@
           const el = document.createElement('div');
           el.className = 'card';
           el.dataset.key = d.key;
-          el.innerHTML = `<div class="name">${d.name}</div><div class="cost">코스트 ${d.cost} • ${d.type==='ranged'?'원거리':'근접'}</div>`;
+          el.innerHTML = `<div class="name">${d.name}</div><div class=\"cost\">코스트 ${d.cost} • ${d.type==='ranged'?'원거리':'근접'}</div>`;
           el.addEventListener('click', ()=>{
             const side = owner==='p1'? state.p1 : state.p2;
             const parent = owner==='p1'? p1Cards : p2Cards;
@@ -272,6 +326,7 @@
 
     // --- 렌더링 --------------------------------------------------------------
     function render(){
+      const ctx = cvs.getContext('2d');
       ctx.clearRect(0,0,W,H);
       // 배경 격자
       ctx.save();
@@ -292,10 +347,10 @@
       ctx.setLineDash([]);
 
       // 베이스 영역
-      ctx.fillStyle = 'rgba(100,200,255,0.06)';
-      ctx.fillRect(GRID_LEFT-12, GRID_TOP-8, 26, GRID_BOTTOM-GRID_TOP+16);
-      ctx.fillStyle = 'rgba(255,120,160,0.06)';
-      ctx.fillRect(GRID_RIGHT-14, GRID_TOP-8, 26, GRID_BOTTOM-GRID_TOP+16);
+      const grd1 = ctx.createLinearGradient(0,0,40,0); grd1.addColorStop(0,'rgba(100,200,255,0.08)'); grd1.addColorStop(1,'rgba(100,200,255,0.02)');
+      const grd2 = ctx.createLinearGradient(W-40,0,W,0); grd2.addColorStop(0,'rgba(255,120,160,0.02)'); grd2.addColorStop(1,'rgba(255,120,160,0.08)');
+      ctx.fillStyle = grd1; ctx.fillRect(GRID_LEFT-12, GRID_TOP-8, 26, GRID_BOTTOM-GRID_TOP+16);
+      ctx.fillStyle = grd2; ctx.fillRect(GRID_RIGHT-14, GRID_TOP-8, 26, GRID_BOTTOM-GRID_TOP+16);
 
       // 유닛
       for(const u of state.units){
@@ -386,28 +441,24 @@
       state.units.length=0; state.projectiles.length=0;
       // 카드 선택 초기화
       state.p1.sel = null; state.p2.sel = null;
-      [...p1Cards.children].forEach(c=>c.classList.remove('sel'));
-      [...p2Cards.children].forEach(c=>c.classList.remove('sel'));
+      if(p1Cards) [...p1Cards.children].forEach(c=>c.classList.remove('sel'));
+      if(p2Cards) [...p2Cards.children].forEach(c=>c.classList.remove('sel'));
+      renderCards();
       render();
     }
 
     // --- 이벤트 바인딩 ------------------------------------------------------
-    modeSel.addEventListener('change', ()=>{ state.mode = modeSel.value; reset(); });
-    btnReset.addEventListener('click', reset);
-    btnPause.addEventListener('click', ()=>{ state.running = !state.running; btnPause.textContent = state.running? '일시정지' : '계속하기'; });
+    const modeSelEl = document.getElementById('mode');
+    const btnResetEl = document.getElementById('btnReset');
+    const btnPauseEl = document.getElementById('btnPause');
+    if(modeSelEl) modeSelEl.addEventListener('change', ()=>{ state.mode = modeSelEl.value; reset(); });
+    if(btnResetEl) btnResetEl.addEventListener('click', reset);
+    if(btnPauseEl) btnPauseEl.addEventListener('click', ()=>{ state.running = !state.running; btnPauseEl.textContent = state.running? '일시정지' : '계속하기'; });
 
-    // 초기화
+    // 초기 렌더(홈 상태)
     renderCards();
-    state.mode = modeSel.value;
-    reset();
+    state.mode = (modeSelEl? modeSelEl.value : 'single');
     requestAnimationFrame(loop);
-
-    // --- 앞으로의 확장 계획 (주석) -----------------------------------------
-    // 1) 온라인 대전: Firebase/Socket으로 매치 룸 생성 → 입력 동기화/상태 권한(호스트권) 설계
-    // 2) 카드 확장: 탱커/버퍼/디버퍼, 스펠카드(광역 피해/힐), 코스트/쿨다운 밸런싱
-    // 3) 이펙트/사운드: WebAudio API, 히트스파크, 사거리/타겟 표시
-    // 4) 모바일 터치 최적화: 드래그-드롭 소환, 반응형 HUD
-    // 5) 리플레이/시드 고정: 동일 시드로 재현 가능한 경기
   </script>
 </body>
 </html>
