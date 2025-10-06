@@ -80,13 +80,42 @@
         <div class="deckshop panel" style="width:100%; max-width:860px;">
           <div class="pane">
             <h3>덱</h3>
-            <span class="placeholder">(추가 예정: 보유 카드, 편성/정렬)</span>
+            <button id="btnDeck" class="btnSmall" style="margin-left:auto;">덱 열기</button>
           </div>
           <div class="pane">
             <h3>상점</h3>
-            <span class="placeholder">(추가 예정: 카드 구매/업그레이드)</span>
+            <span class="placeholder" style="margin-left:auto;">(추가 예정)</span>
           </div>
         </div>
+
+        <!-- 덱 편집기 -->
+        <section id="deckEditor" class="panel" style="display:none; width:100%; max-width:860px; padding:16px; text-align:left;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;">
+            <h3 style="margin:0;">덱 편집</h3>
+            <div style="display:flex; gap:8px;">
+              <button id="btnDeckSave" class="btnSmall">저장</button>
+              <button id="btnDeckClose" class="btnSmall" style="opacity:.9">닫기</button>
+            </div>
+          </div>
+
+          <!-- 위: 6장 배치 칸 -->
+          <div class="deckSlots" aria-label="덱 슬롯 6칸">
+            <div class="slot" data-idx="0"></div>
+            <div class="slot" data-idx="1"></div>
+            <div class="slot" data-idx="2"></div>
+            <div class="slot" data-idx="3"></div>
+            <div class="slot" data-idx="4"></div>
+            <div class="slot" data-idx="5"></div>
+          </div>
+          <p class="tip" style="margin:8px 2px 18px;">카드 칩을 클릭하면 빈 슬롯에 들어갑니다. 슬롯을 클릭하면 비워집니다.</p>
+
+          <!-- 아래: 획득/미획득 목록 -->
+          <h4 class="label">획득 카드</h4>
+          <div id="ownedCards" class="cardPool"></div>
+
+          <h4 class="label" style="margin-top:14px;">미획득 카드</h4>
+          <div id="lockedCards" class="cardPool locked"></div>
+        </section>
       </div>
     </section>
 
@@ -146,10 +175,81 @@
   <footer>© 2025 카드 디펜스 — GitHub Pages 배포용 단일 파일</footer>
 
   <script>
-    // --- 홈 → 게임 전환 ---------------------------------------------------
+    // --- 덱 에디터 데이터 ---------------------------------------------------
+    const CARD_DB = [
+      { key:'knight', name:'기사',   cost:4, hp:40, dps:6,  range:28,  speed:36, type:'melee' },
+      { key:'archer', name:'궁수',   cost:6, hp:24, dps:8,  range:180, speed:24, type:'ranged' },
+      { key:'mage',   name:'메이지', cost:7, hp:22, dps:11, range:150, speed:20, type:'ranged' },
+      // 미획득 예시 카드
+      { key:'tank',   name:'탱커',  cost:5, hp:70, dps:3,  range:24,  speed:22, type:'melee', locked:true },
+      { key:'healer', name:'힐러',  cost:6, hp:28, dps:0,  range:120, speed:20, type:'support', locked:true },
+      { key:'rogue',  name:'도적',  cost:5, hp:26, dps:10, range:40,  speed:40, type:'melee', locked:true },
+    ];
+
+    const DECK_SIZE = 6;
+    let deck = JSON.parse(localStorage.getItem('deck')||'[]');
+    if(!Array.isArray(deck) || deck.length!==DECK_SIZE){ deck = Array(DECK_SIZE).fill(null); }
+
+    // --- 요소 참조 -----------------------------------------------------------
     const home = document.getElementById('home');
     const gameArea = document.getElementById('gameArea');
     const btnPlay = document.getElementById('btnPlay');
+
+    const deckEditor = document.getElementById('deckEditor');
+    const btnDeck = document.getElementById('btnDeck');
+    const btnDeckSave = document.getElementById('btnDeckSave');
+    const btnDeckClose = document.getElementById('btnDeckClose');
+
+    const ownedWrap  = document.getElementById('ownedCards');
+    const lockedWrap = document.getElementById('lockedCards');
+
+    // --- 유틸 DOM ----------------------------------------------------------
+    function makeChip(card, locked=false){
+      const el = document.createElement('button');
+      el.className = 'chip' + (locked? ' locked':'' );
+      el.type = 'button';
+      el.textContent = card.name + (locked? ' (미획득)':'' );
+      if(!locked){
+        el.addEventListener('click', ()=>{
+          const idx = deck.findIndex(x=>!x);
+          if(idx===-1){ alert('덱이 가득 찼습니다. (6장) 슬롯을 비우고 다시 추가하세요.'); return; }
+          deck[idx] = card.key; renderDeckSlots();
+        });
+      }
+      return el;
+    }
+
+    function renderDeckEditor(){
+      // 획득/미획득 리스트
+      const owned = CARD_DB.filter(c=>!c.locked);
+      const locked = CARD_DB.filter(c=> c.locked);
+      ownedWrap.replaceChildren(...owned.map(c=>makeChip(c,false)));
+      lockedWrap.replaceChildren(...locked.map(c=>makeChip(c,true)));
+      renderDeckSlots();
+    }
+
+    function renderDeckSlots(){
+      const slots = deckEditor.querySelectorAll('.slot');
+      slots.forEach((s,i)=>{
+        const key = deck[i];
+        s.textContent = key ? (CARD_DB.find(c=>c.key===key)?.name||key) : '빈 슬롯';
+        s.classList.toggle('filled', !!key);
+      });
+    }
+
+    // 슬롯 클릭 → 비우기
+    deckEditor?.addEventListener('click', (e)=>{
+      const box = e.target.closest('.slot');
+      if(!box) return;
+      const idx = +box.dataset.idx;
+      deck[idx] = null; renderDeckSlots();
+    });
+
+    btnDeck?.addEventListener('click', ()=>{ deckEditor.style.display='block'; renderDeckEditor(); });
+    btnDeckClose?.addEventListener('click', ()=>{ deckEditor.style.display='none'; });
+    btnDeckSave?.addEventListener('click', ()=>{ localStorage.setItem('deck', JSON.stringify(deck)); alert('덱이 저장되었습니다.'); });
+
+    // --- 홈 → 게임 전환 ---------------------------------------------------
     btnPlay.addEventListener('click', ()=>{ home.style.display='none'; gameArea.style.display='block'; reset(); });
 
     // --- 게임 상수/유틸 ----------------------------------------------------
@@ -196,17 +296,22 @@
 
     // --- UI: 카드 생성 ------------------------------------------------------
     function renderCards(){
+      // 덱 우선: 덱이 비어있지 않으면 덱에 들어있는 카드만 표시
+      const selectedKeys = deck.filter(Boolean);
+      const src = selectedKeys.length? CARD_DB.filter(c=> selectedKeys.includes(c.key))
+                                     : CARD_DB.filter(c=> !c.locked); // 기본: 획득 카드
       function makeCardEl(owner){
-        return CARD_DEFS.map((d,i)=>{
+        return src.map((d)=>{
+          // 게임용 상세(def) 찾기
+          const def = CARD_DEFS.find(x=>x.key===d.key) || { name:d.name, cost:5, hp:20, dps:5, range:40, speed:30, attackCd:0.9, type:'melee' };
           const el = document.createElement('div');
           el.className = 'card';
-          el.dataset.key = d.key;
-          el.innerHTML = `<div class="name">${d.name}</div><div class=\"cost\">코스트 ${d.cost} • ${d.type==='ranged'?'원거리':'근접'}</div>`;
+          el.dataset.key = def.key || d.key;
+          el.innerHTML = `<div class="name">${def.name}</div><div class=\"cost\">코스트 ${def.cost} • ${(def.type==='ranged')?'원거리':'근접'}</div>`;
           el.addEventListener('click', ()=>{
             const side = owner==='p1'? state.p1 : state.p2;
             const parent = owner==='p1'? p1Cards : p2Cards;
-            // 토글 선택
-            if(side.sel===d.key){ side.sel=null; } else { side.sel=d.key; }
+            if(side.sel=== (def.key||d.key)){ side.sel=null; } else { side.sel=(def.key||d.key); }
             [...parent.children].forEach(c=>c.classList.toggle('sel', c.dataset.key===side.sel));
           });
           return el;
@@ -318,8 +423,11 @@
         // 간단한 전략: 우리 쪽 레인에 적이 많은 곳을 우선 보강
         const lanes = [...Array(LANES)].map((_,i)=>i);
         const prio = lanes.sort((a,b)=> countP1(a)-countP1(b)); // P1 유닛이 많은 레인을 먼저 방어
-        const choice = CARD_DEFS.slice().reverse().find(c=> state.p2.mana>=c.cost );
-        if(choice){ spawn('p2', choice.key, prio[0]); }
+        const choice = CARD_DB.filter(c=>!c.locked).reverse().find(c=> state.p2.mana>= (CARD_DB.find(x=>x.key===c.key)?.cost||5) );
+        // AI는 실제 전투 파라미터 테이블(CARD_DEFS) 기준 스폰 시도
+        const spawnKey = (choice && ['knight','archer','mage'].includes(choice.key)) ? choice.key : 'knight';
+        const lane = prio[0];
+        spawn('p2', spawnKey, lane);
       }
     }
     function countP1(lane){ return state.units.filter(u=>u.side==='p1' && u.lane===lane).length; }
@@ -347,10 +455,10 @@
       ctx.setLineDash([]);
 
       // 베이스 영역
-      const grd1 = ctx.createLinearGradient(0,0,40,0); grd1.addColorStop(0,'rgba(100,200,255,0.08)'); grd1.addColorStop(1,'rgba(100,200,255,0.02)');
-      const grd2 = ctx.createLinearGradient(W-40,0,W,0); grd2.addColorStop(0,'rgba(255,120,160,0.02)'); grd2.addColorStop(1,'rgba(255,120,160,0.08)');
-      ctx.fillStyle = grd1; ctx.fillRect(GRID_LEFT-12, GRID_TOP-8, 26, GRID_BOTTOM-GRID_TOP+16);
-      ctx.fillStyle = grd2; ctx.fillRect(GRID_RIGHT-14, GRID_TOP-8, 26, GRID_BOTTOM-GRID_TOP+16);
+      ctx.fillStyle = 'rgba(100,200,255,0.06)';
+      ctx.fillRect(GRID_LEFT-12, GRID_TOP-8, 26, GRID_BOTTOM-GRID_TOP+16);
+      ctx.fillStyle = 'rgba(255,120,160,0.06)';
+      ctx.fillRect(GRID_RIGHT-14, GRID_TOP-8, 26, GRID_BOTTOM-GRID_TOP+16);
 
       // 유닛
       for(const u of state.units){
@@ -359,11 +467,9 @@
         ctx.fillStyle = isP1 ? '#6dd3ff' : '#ff8ab0';
         ctx.strokeStyle = 'rgba(0,0,0,0.6)';
         ctx.lineWidth = 2;
-        // 본체
         ctx.beginPath();
         ctx.arc(u.x, y, 12, 0, Math.PI*2);
         ctx.fill(); ctx.stroke();
-        // HP bar
         const hpw = 30, hph = 6;
         ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(u.x-hpw/2, y-20, hpw, hph);
         const hpRatio = clamp(u.hp/u.def.hp, 0, 1);
@@ -391,7 +497,6 @@
       p1Txt.textContent = `${Math.floor(state.p1.mana)} / ${MAX_MANA}`;
       p2Txt.textContent = `${Math.floor(state.p2.mana)} / ${MAX_MANA}`;
 
-      // 승패 메시지
       if(state.p1.baseHp<=0 || state.p2.baseHp<=0){
         ctx.save();
         ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,H);
@@ -403,6 +508,7 @@
     }
 
     // --- 입력: 캔버스 클릭으로 소환 ----------------------------------------
+    const cvs = document.getElementById('game');
     cvs.addEventListener('click', (e)=>{
       if(!state.running) return;
       const rect = cvs.getBoundingClientRect();
@@ -439,15 +545,11 @@
       state.p1.mana=5; state.p2.mana=5;
       state.p1.baseHp = BASE_HP_MAX; state.p2.baseHp = BASE_HP_MAX;
       state.units.length=0; state.projectiles.length=0;
-      // 카드 선택 초기화
       state.p1.sel = null; state.p2.sel = null;
-      if(p1Cards) [...p1Cards.children].forEach(c=>c.classList.remove('sel'));
-      if(p2Cards) [...p2Cards.children].forEach(c=>c.classList.remove('sel'));
       renderCards();
       render();
     }
 
-    // --- 이벤트 바인딩 ------------------------------------------------------
     const modeSelEl = document.getElementById('mode');
     const btnResetEl = document.getElementById('btnReset');
     const btnPauseEl = document.getElementById('btnPause');
